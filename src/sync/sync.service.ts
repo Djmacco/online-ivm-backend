@@ -71,7 +71,12 @@ export class SyncService {
       async (tx) => {
         // ONE writer per business at a time. This also guarantees that the `serverSeq` cursor becomes visible in
         // order (no row with a lower seq can commit after a higher one), so a pulling device can never skip a change.
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${businessId}))`;
+        // Prisma cannot deserialize PostgreSQL's `void` return type. Keep the advisory lock
+        // in a volatile CTE, but return a supported scalar to the client.
+        await tx.$queryRaw`WITH business_lock AS (
+          SELECT pg_advisory_xact_lock(hashtext(${businessId}))
+        )
+        SELECT 1 FROM business_lock`;
 
         const prev = await tx.syncOperation.findUnique({ where: { businessId_opId: { businessId, opId: c.opId } } });
         if (prev) return { ...(prev.result as unknown as PushResult), status: 'DUPLICATE' as const };

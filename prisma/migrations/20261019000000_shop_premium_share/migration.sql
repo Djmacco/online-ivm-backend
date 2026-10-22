@@ -1,4 +1,4 @@
-﻿-- A device may receive shop-wide Premium from one active owner device.
+-- A device may receive shop-wide Premium from one active owner device.
 CREATE TABLE "PremiumShare" (
     "ownerDeviceId" TEXT NOT NULL,
     "memberDeviceId" TEXT NOT NULL,
