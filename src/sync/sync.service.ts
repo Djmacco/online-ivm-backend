@@ -39,6 +39,14 @@ export class SyncService {
    * change comes back as DUPLICATE (opId ledger) – so nothing is lost and nothing is duplicated.
    */
   async push(user: AuthUser, changes: ChangeDto[], ip?: string): Promise<{ results: PushResult[] }> {
+    // A browser can view the cloud mirror, but the LAN hub remains the write authority until the
+    // desktop implements a bidirectional relay. Enforce this on the server, not just in the UI.
+    if (user.kind === 'account') {
+      const device = await this.prisma.device.findFirst({ where: { id: user.deviceId, businessId: user.businessId, revokedAt: null }, select: { platform: true } });
+      if (device?.platform === 'WEB') {
+        throw new HttpException({ code: 'WEB_READ_ONLY', message: 'Web devices are read-only until shop cloud relay is enabled.' }, HttpStatus.FORBIDDEN);
+      }
+    }
     const results: PushResult[] = [];
     for (const c of changes) results.push(await this.applyOne(user, c));
     const n = (s: PushResult['status']) => results.filter((r) => r.status === s).length;

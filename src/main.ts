@@ -14,7 +14,7 @@ async function bootstrap() {
   app.use(helmet());
   app.useBodyParser('json', { limit: '10mb' }); // 10 MB: shelf photos for AI store scanning
   // The Tauri webview calls this API with fetch(), so CORS must allow its origins (X-Device-Id is reflected automatically).
-  const origins = (process.env.CORS_ORIGINS ?? 'tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost:1420,http://127.0.0.1:1420')
+  const origins = (process.env.CORS_ORIGINS ?? 'tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost:1420,http://127.0.0.1:1420,http://localhost:5173,https://stockai-online.vercel.app')
     .split(',').map((s) => s.trim()).filter(Boolean);
   app.enableCors({ origin: origins, credentials: false /* bearer tokens, no cookies */ });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));

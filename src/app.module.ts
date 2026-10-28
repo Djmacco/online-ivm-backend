@@ -16,6 +16,7 @@ import { PrismaModule } from './prisma/prisma.service';
 import { SubscriptionsModule } from './subscriptions/subscriptions.controller';
 import { SyncModule } from './sync/sync.controller';
 import { UsersModule } from './users/users.controller';
+import { MonitoringModule } from './monitoring/monitoring.module';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { UsersModule } from './users/users.controller';
     PrismaModule, AuditModule, AuditApiModule,
     AuthModule, UsersModule, DevicesModule,
     SubscriptionsModule, PaymentsModule,
-    SyncModule,
+    SyncModule, MonitoringModule,
     AiModule, HealthModule,
   ],
   providers: [

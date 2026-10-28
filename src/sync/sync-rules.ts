@@ -11,7 +11,7 @@ export const SYNC_TABLES = [
   'categories', 'suppliers', 'customers', 'products', 'product_batches', 'stock_movements',
   'cash_sessions', 'sales', 'sale_items', 'customer_payments', 'purchases', 'purchase_items',
   'supplier_payments', 'expenses', 'audit_log',
-  'stock_counts', 'stock_count_items', 'documents', 'document_items',
+  'stock_counts', 'stock_count_items', 'documents', 'document_items', 'shop_transfers', 'shop_transfer_items',
   // access control + shop settings (administrators only, see RESTRICTED_TABLES)
   'roles', 'role_permissions', 'users', 'app_settings',
 ] as const;
@@ -29,12 +29,12 @@ export const RESTORE_ORDER = [
   'products', 'product_batches', 'stock_movements',
   'sales', 'sale_items', 'customer_payments',
   'purchases', 'purchase_items', 'supplier_payments',
-  'stock_counts', 'stock_count_items', 'documents', 'document_items',
+  'stock_counts', 'stock_count_items', 'documents', 'document_items', 'shop_transfers', 'shop_transfer_items',
   'audit_log',
 ] as const;
 
 /** Same id = same record. Replays are DUPLICATE, never CONFLICT, and they can never be modified. */
-export const IMMUTABLE_TABLES = new Set(['stock_movements', 'sale_items', 'customer_payments', 'supplier_payments', 'purchase_items', 'audit_log', 'document_items']);
+export const IMMUTABLE_TABLES = new Set(['stock_movements', 'sale_items', 'customer_payments', 'supplier_payments', 'purchase_items', 'audit_log', 'document_items', 'shop_transfers', 'shop_transfer_items']);
 
 /**
  * Staff accounts (with their password HASHES), roles and shop settings are only pushed, stored or sent to accounts that hold

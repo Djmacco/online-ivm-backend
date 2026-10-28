@@ -91,4 +91,3 @@ Premium missing → `402 {"code":"PREMIUM_REQUIRED"}` (the desktop maps this to 
 ## Not included (vs. the first version)
 The generic REST resources (`/products`, `/sales`, `/inventory/adjust`) and `/reports/*` were removed: the desktop contract syncs snake_case
 tables with its own conflict policy, so they'll be rebuilt for web/mobile against that schema. See `docs/DESKTOP_SETUP.md` for wiring the app.
-# online-ivm-backend

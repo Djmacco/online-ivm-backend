@@ -65,7 +65,7 @@ Add these in the service's **Environment** settings. Use Render's secret fields 
 | `NOTCHPAY_SECRET_KEY` | Production Notch Pay secret key |
 | `NOTCHPAY_HASH_KEY` | Webhook signing key from Notch Pay |
 | `PUBLIC_API_URL` | The final public service URL, e.g. `https://your-service.onrender.com` (no trailing slash) |
-| `CORS_ORIGINS` | Desktop origins, comma-separated: `tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost:1420,http://127.0.0.1:1420` |
+| `CORS_ORIGINS` | Comma-separated desktop and web origins, including `https://stockai-online.vercel.app` |
 | `PREMIUM_PRICE_XAF` | `3900`; keep equal to the desktop's displayed price |
 | `PREMIUM_PERIOD_DAYS` | `30` |
 | `RESTORE_WINDOW_DAYS` | Optional; defaults to `7` |

@@ -57,6 +57,12 @@ export class SubscriptionsController {
     return this.subs.shareDevices(user.deviceId, dto.deviceIds);
   }
 
+  /** A shop administrator may authorize this signed-in browser device for the shop's existing paid plan. */
+  @ApiBearerAuth() @Permissions('subscription.manage') @Post('share/web') @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  shareWebDevice(@CurrentUser() user: AuthUser) {
+    return this.subs.shareWebDevice(user);
+  }
+
   /** Stop sharing with a device removed from the shop network. Only the original owner can remove its share. */
   @ApiBearerAuth() @AllowDeviceToken() @Delete('share/:deviceId') @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async unshare(@CurrentUser() user: AuthUser, @Param('deviceId') deviceId: string) {

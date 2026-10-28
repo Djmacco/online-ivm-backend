@@ -149,41 +149,79 @@ export class SubscriptionsService {
   /** A paying device shares its active Premium with up to nine paired shop PCs. */
   async shareDevices(ownerDeviceId: string, deviceIds: string[]): Promise<SharedDeviceDto[]> {
     const unique = [...new Set(deviceIds)];
-    const owner = await this.getActive(ownerDeviceId);
-    if (!owner || await this.prisma.premiumShare.findUnique({ where: { memberDeviceId: ownerDeviceId } })) {
-      return unique.map((deviceId) => ({ deviceId, status: 'INVALID', entitlement: null, deviceToken: null, expiresAt: null }));
-    }
-    const currentCount = await this.prisma.premiumShare.count({ where: { ownerDeviceId } });
-    let slots = Math.max(0, 9 - currentCount);
-    const results: SharedDeviceDto[] = [];
-    for (const deviceId of unique) {
-      if (!deviceId || deviceId === ownerDeviceId || deviceId.length > 100) {
-        results.push({ deviceId, status: 'INVALID', entitlement: null, deviceToken: null, expiresAt: null }); continue;
+    const results = await this.prisma.$transaction(async (tx) => {
+      // Serialize shares from the LAN and web flows so two simultaneous requests cannot both claim the last slot.
+      await tx.$queryRaw`WITH share_lock AS (SELECT pg_advisory_xact_lock(hashtext(${ownerDeviceId}))) SELECT 1 FROM share_lock`;
+      const now = new Date();
+      const owner = await tx.subscription.findFirst({ where: { deviceId: ownerDeviceId, plan: 'PREMIUM', status: 'ACTIVE', expiresAt: { gt: now } }, orderBy: { expiresAt: 'desc' } });
+      const ownerIsMember = await tx.premiumShare.findUnique({ where: { memberDeviceId: ownerDeviceId } });
+      if (!owner || ownerIsMember) return unique.map((deviceId) => ({ deviceId, status: 'INVALID' as const, entitlement: null, deviceToken: null, expiresAt: null }));
+
+      let slots = Math.max(0, 9 - await tx.premiumShare.count({ where: { ownerDeviceId } }));
+      const batch: SharedDeviceDto[] = [];
+      for (const deviceId of unique) {
+        if (!deviceId || deviceId === ownerDeviceId || deviceId.length > 100) {
+          batch.push({ deviceId, status: 'INVALID', entitlement: null, deviceToken: null, expiresAt: null }); continue;
+        }
+        const own = await tx.subscription.findFirst({ where: { deviceId, status: 'ACTIVE', plan: 'PREMIUM', expiresAt: { gt: now } }, orderBy: { expiresAt: 'desc' } });
+        if (own) { batch.push({ deviceId, status: 'OWN_SUBSCRIPTION', entitlement: null, deviceToken: null, expiresAt: null }); continue; }
+        const prior = await tx.premiumShare.findUnique({ where: { memberDeviceId: deviceId } });
+        if (prior && prior.ownerDeviceId !== ownerDeviceId) {
+          batch.push({ deviceId, status: 'INVALID', entitlement: null, deviceToken: null, expiresAt: null }); continue;
+        }
+        if (!prior && slots <= 0) { batch.push({ deviceId, status: 'INVALID', entitlement: null, deviceToken: null, expiresAt: null }); continue; }
+        await tx.premiumShare.upsert({ where: { memberDeviceId: deviceId }, create: { ownerDeviceId, memberDeviceId: deviceId }, update: { ownerDeviceId } });
+        if (!prior) slots--;
+        batch.push({ deviceId, status: prior ? 'ALREADY_SHARED' : 'SHARED', entitlement: this.issueEntitlement(deviceId, owner), deviceToken: null, expiresAt: owner.expiresAt.toISOString() });
       }
-      if (await this.getActive(deviceId)) {
-        results.push({ deviceId, status: 'OWN_SUBSCRIPTION', entitlement: null, deviceToken: null, expiresAt: null }); continue;
-      }
-      const prior = await this.prisma.premiumShare.findUnique({ where: { memberDeviceId: deviceId } });
-      if (prior && prior.ownerDeviceId !== ownerDeviceId) {
-        results.push({ deviceId, status: 'INVALID', entitlement: null, deviceToken: null, expiresAt: null }); continue;
-      }
-      if (!prior && slots <= 0) {
-        results.push({ deviceId, status: 'INVALID', entitlement: null, deviceToken: null, expiresAt: null }); continue;
-      }
-      await this.prisma.premiumShare.upsert({
-        where: { memberDeviceId: deviceId },
-        create: { ownerDeviceId, memberDeviceId: deviceId },
-        update: { ownerDeviceId },
-      });
-      if (!prior) slots--;
-      const token = await this.ensureSharedDeviceToken(deviceId);
-      results.push({
-        deviceId, status: prior ? 'ALREADY_SHARED' : 'SHARED',
-        entitlement: this.issueEntitlement(deviceId, owner), deviceToken: token,
-        expiresAt: owner.expiresAt.toISOString(),
-      });
+      return batch;
+    }, { timeout: 15_000 });
+
+    for (const result of results) {
+      if (result.status === 'SHARED') result.deviceToken = await this.ensureSharedDeviceToken(result.deviceId);
     }
     return results;
+  }
+
+  /**
+   * Authorize one registered browser device against an active subscription already owned by this shop.
+   * The browser must have logged in as a shop administrator and must have been registered as platform WEB.
+   * It receives its own signed entitlement; device identity and receipt counters are never shared with a PC.
+   */
+  async shareWebDevice(user: AuthUser): Promise<SharedDeviceDto> {
+    if (user.kind !== 'account' || !user.businessId) {
+      throw new ForbiddenException({ code: 'WEB_DEVICE_ACCOUNT_REQUIRED', message: 'Sign in with a shop administrator account.' });
+    }
+    const device = await this.prisma.device.findFirst({
+      where: { id: user.deviceId, businessId: user.businessId, revokedAt: null },
+      select: { id: true, platform: true },
+    });
+    if (!device || device.platform !== 'WEB') {
+      throw new ForbiddenException({ code: 'WEB_DEVICE_REQUIRED', message: 'This browser is not registered as a web device.' });
+    }
+
+    const own = await this.getActive(device.id);
+    if (own) {
+      return { deviceId: device.id, status: 'OWN_SUBSCRIPTION', entitlement: this.issueEntitlement(device.id, own), deviceToken: null, expiresAt: own.expiresAt.toISOString() };
+    }
+
+    const shopDevices = await this.prisma.device.findMany({
+      where: { businessId: user.businessId, revokedAt: null }, select: { id: true },
+    });
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: { deviceId: { in: shopDevices.map((d) => d.id) }, status: 'ACTIVE', plan: 'PREMIUM', expiresAt: { gt: new Date() } },
+      orderBy: { expiresAt: 'desc' }, select: { deviceId: true },
+    });
+    for (const subscription of subscriptions) {
+      const result = await this.shareDevices(subscription.deviceId, [device.id]);
+      const shared = result[0];
+      if (shared && (shared.status === 'SHARED' || shared.status === 'ALREADY_SHARED')) return shared;
+      if (shared?.status === 'OWN_SUBSCRIPTION') {
+        const active = await this.getActive(device.id);
+        if (active) return { ...shared, entitlement: this.issueEntitlement(device.id, active), expiresAt: active.expiresAt.toISOString() };
+      }
+    }
+    throw new HttpException({ code: 'PREMIUM_REQUIRED', message: 'This shop needs an active Premium subscription and an available shared-device slot.' }, HttpStatus.PAYMENT_REQUIRED);
   }
 
   /** Remove a member only when the caller is the recorded owner. */
