@@ -68,6 +68,8 @@ Add these in the service's **Environment** settings. Use Render's secret fields 
 | `CORS_ORIGINS` | Comma-separated desktop and web origins, including `https://stockai-online.vercel.app` |
 | `PREMIUM_PRICE_XAF` | `3900`; keep equal to the desktop's displayed price |
 | `PREMIUM_PERIOD_DAYS` | `30` |
+| `PREMIUM_QUARTERLY_PRICE_XAF` | `10000`; server-side price for the three-month option |
+| `PREMIUM_QUARTERLY_PERIOD_DAYS` | `90`; duration credited after confirmed quarterly payment |
 | `RESTORE_WINDOW_DAYS` | Optional; defaults to `7` |
 | `RESTORE_MAX_DEVICES` | Optional; defaults to `3` |
 | `AI_PROVIDER` | `gemini` or `anthropic` |

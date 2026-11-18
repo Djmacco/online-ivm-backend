@@ -47,7 +47,7 @@ Premium missing → `402 {"code":"PREMIUM_REQUIRED"}` (the desktop maps this to 
 ## How it behaves
 * **Premium is per DEVICE** (the customer pays from the app without an account). Enforced server-side on sync and scan. A subscribed main PC can share Premium with up to nine paired shop PCs.
 * **One introductory trial per shop and main PC**: one 30-minute cloud sync window and one successful AI shelf scan. The claim is stored in the database, so a new account or reinstall on the same PC cannot reset it. A failed scan releases its claim; successful scans consume it. Restore remains free under its separate recovery limits.
-* **Price is decided by the server** (`PREMIUM_PRICE_XAF`, default **3900** to match the desktop). Keep it equal to `PREMIUM_PRICE_XAF`
+* **Prices are decided by the server** (`PREMIUM_PRICE_XAF`, default **3900** per month; `PREMIUM_QUARTERLY_PRICE_XAF`, default **10000** for 90 days). Keep them equal to the desktop's displayed prices.
   in `desktop/src/entitlement/entitlement.ts` – the user must be charged what the app displays.
 * **Entitlement** = `base64url(JSON).base64url(Ed25519 signature)`, raw-hex keys, byte-compatible with the desktop verifier
   (tested both directions with `@noble/curves`). Valid offline until `expiresAt`; bound to the device; clock-rollback detectable.

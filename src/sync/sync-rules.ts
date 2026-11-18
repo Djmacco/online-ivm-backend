@@ -12,6 +12,7 @@ export const SYNC_TABLES = [
   'cash_sessions', 'sales', 'sale_items', 'customer_payments', 'purchases', 'purchase_items',
   'supplier_payments', 'expenses', 'audit_log',
   'stock_counts', 'stock_count_items', 'documents', 'document_items', 'shop_transfers', 'shop_transfer_items',
+  'warehouses', 'warehouse_transactions', 'warehouse_transaction_items', 'warehouse_stock_movements', 'warehouse_dispatches', 'warehouse_dispatch_items',
   // access control + shop settings (administrators only, see RESTRICTED_TABLES)
   'roles', 'role_permissions', 'users', 'app_settings',
 ] as const;
@@ -30,11 +31,12 @@ export const RESTORE_ORDER = [
   'sales', 'sale_items', 'customer_payments',
   'purchases', 'purchase_items', 'supplier_payments',
   'stock_counts', 'stock_count_items', 'documents', 'document_items', 'shop_transfers', 'shop_transfer_items',
+  'warehouses', 'warehouse_transactions', 'warehouse_transaction_items', 'warehouse_stock_movements', 'warehouse_dispatches', 'warehouse_dispatch_items',
   'audit_log',
 ] as const;
 
 /** Same id = same record. Replays are DUPLICATE, never CONFLICT, and they can never be modified. */
-export const IMMUTABLE_TABLES = new Set(['stock_movements', 'sale_items', 'customer_payments', 'supplier_payments', 'purchase_items', 'audit_log', 'document_items', 'shop_transfers', 'shop_transfer_items']);
+export const IMMUTABLE_TABLES = new Set(['stock_movements', 'sale_items', 'customer_payments', 'supplier_payments', 'purchase_items', 'audit_log', 'document_items', 'shop_transfers', 'shop_transfer_items', 'warehouse_transactions', 'warehouse_transaction_items', 'warehouse_stock_movements', 'warehouse_dispatches', 'warehouse_dispatch_items']);
 
 /**
  * Staff accounts (with their password HASHES), roles and shop settings are only pushed, stored or sent to accounts that hold
@@ -54,6 +56,9 @@ export const hiddenTables = (granted: readonly string[]): string[] => Object.key
 export const SHOP_SETTING_KEYS = [
   'business_name', 'branch_name', 'expiry_alert_days', 'max_discount_percent', 'payment_methods', 'default_minimum_stock',
   'business_tax_id', 'tax_rate', 'invoice_prefix', 'proforma_prefix', 'proforma_valid_days', 'invoice_notes',
+  'receipt_tagline', 'business_phone', 'business_address', 'receipt_footer', 'receipt_logo', 'receipt_show_time',
+  'receipt_paper_width', 'receipt_font_size', 'receipt_layout', 'receipt_greeting', 'receipt_thank_you', 'receipt_disclaimer',
+  'receipt_show_greeting', 'receipt_show_cashier', 'receipt_show_customer', 'receipt_show_contact', 'receipt_show_amount_words', 'receipt_show_disclaimer',
 ] as const;
 const SETTING_SET = new Set<string>(SHOP_SETTING_KEYS);
 

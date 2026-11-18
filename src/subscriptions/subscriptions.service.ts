@@ -271,20 +271,26 @@ export class SubscriptionsService {
   publicKeyHex(): string {
     return publicKeyHexFromPrivate(this.config.getOrThrow<string>('ENTITLEMENT_PRIVATE_KEY'));
   }
-  price(): number { return Number(this.config.get('PREMIUM_PRICE_XAF') ?? 3900); }
-  periodDays(): number { return Number(this.config.get('PREMIUM_PERIOD_DAYS') ?? 30); }
+  private positiveIntegerSetting(key: string, fallback: number): number {
+    const value = Number(this.config.get(key));
+    return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+  }
+  price(): number { return this.positiveIntegerSetting('PREMIUM_PRICE_XAF', 3900); }
+  periodDays(): number { return this.positiveIntegerSetting('PREMIUM_PERIOD_DAYS', 30); }
+  quarterlyPrice(): number { return this.positiveIntegerSetting('PREMIUM_QUARTERLY_PRICE_XAF', 10000); }
+  quarterlyPeriodDays(): number { return this.positiveIntegerSetting('PREMIUM_QUARTERLY_PERIOD_DAYS', 90); }
 
   /**
    * Called ONLY by the payments service after the transaction was verified server-side with Notch Pay.
    * Renewals stack: paying while active extends from max(now, current expiry) – no days are lost.
    */
-  async activate(tx: Prisma.TransactionClient, p: { deviceId: string; transactionId: string; amount: number; currency: string }) {
+  async activate(tx: Prisma.TransactionClient, p: { deviceId: string; transactionId: string; amount: number; periodDays: number; currency: string }) {
     const existing = await tx.subscription.findUnique({ where: { transactionId: p.transactionId } });
     if (existing) return existing; // idempotent: webhook replays / polling cannot double-credit
     const now = new Date();
     const current = await tx.subscription.findFirst({ where: { deviceId: p.deviceId, status: 'ACTIVE', expiresAt: { gt: now } }, orderBy: { expiresAt: 'desc' } });
     const startedAt = current ? current.expiresAt : now;
-    const expiresAt = new Date(startedAt.getTime() + this.periodDays() * 86_400_000);
+    const expiresAt = new Date(startedAt.getTime() + p.periodDays * 86_400_000);
     return tx.subscription.create({
       data: { deviceId: p.deviceId, plan: 'PREMIUM', price: p.amount, currency: p.currency, status: 'ACTIVE', provider: 'NOTCHPAY', transactionId: p.transactionId, startedAt, expiresAt },
     });

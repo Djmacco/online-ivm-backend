@@ -34,14 +34,18 @@ export class PaymentsService {
     const recent = await this.prisma.payment.count({ where: { deviceId: dto.deviceId, createdAt: { gt: new Date(Date.now() - 10 * 60_000) } } });
     if (recent >= MAX_ATTEMPTS_PER_DEVICE) throw new HttpException('Too many payment attempts. Please wait a few minutes.', HttpStatus.TOO_MANY_REQUESTS);
 
-    const amount = this.subs.price();
+    const billingPeriod = dto.billingPeriod ?? 'MONTHLY'; // older desktop builds remain monthly by default
+    const amount = billingPeriod === 'QUARTERLY' ? this.subs.quarterlyPrice() : this.subs.price();
+    const periodDays = billingPeriod === 'QUARTERLY' ? this.subs.quarterlyPeriodDays() : this.subs.periodDays();
     const reference = `IMS-${randomBytes(16).toString('hex')}`.toUpperCase(); // 128-bit: unguessable, doubles as the polling secret
-    const payment = await this.prisma.payment.create({ data: { deviceId: dto.deviceId, reference, provider: dto.provider, amount, currency: 'XAF', phone } });
+    // Persist the server-selected term in the existing JSON column so a later webhook/poll
+    // grants the exact purchased duration, even if pricing configuration changes meanwhile.
+    const payment = await this.prisma.payment.create({ data: { deviceId: dto.deviceId, reference, provider: dto.provider, amount, rawProviderState: { billingPeriod, periodDays }, currency: 'XAF', phone } });
 
     try {
       const init = await this.settler.notch<any>('POST', '/payments', {
         amount, currency: 'XAF', reference,
-        description: 'StockFlow AI Premium – 1 month',
+        description: `StockFlow AI Premium – ${periodDays} days`,
         customer: { name: 'StockFlow customer', email: this.config.get<string>('PAYMENT_CUSTOMER_EMAIL') ?? 'payments@stockflow.invalid', phone },
         callback: `${this.config.get('PUBLIC_API_URL') ?? ''}/payments/notchpay/callback`,
         metadata: { paymentId: payment.id },

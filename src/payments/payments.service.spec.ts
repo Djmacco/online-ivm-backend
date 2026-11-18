@@ -89,6 +89,18 @@ describe('Notch Pay → subscription → signed entitlement (public, device-base
     expect(JSON.parse((orange.mock.calls.at(-1)![1] as any).body).channel).toBe("cm.orange");
   });
 
+  it('offers a server-priced 90-day Premium term for 10000 XAF', async () => {
+    let ref = '';
+    const spy = mockNotch({ verify: () => completeTx(ref, { amount: 10000 }) });
+    const result = await payments.create({ plan: 'PREMIUM', billingPeriod: 'QUARTERLY', provider: 'MTN_MOMO', phone: '237677123456', deviceId: DEV });
+    ref = result.reference;
+    const createCall = spy.mock.calls.find((c) => String(c[0]).endsWith('/payments'))!;
+    expect(JSON.parse((createCall[1] as any).body)).toMatchObject({ amount: 10000, currency: 'XAF', description: expect.stringContaining('90 days') });
+    expect(db.payments[0].rawProviderState).toMatchObject({ billingPeriod: 'QUARTERLY', periodDays: 90 });
+    expect(await settler.verifyAndSettle(ref)).toBe('COMPLETE');
+    expect(db.subs[0].expiresAt.getTime() - db.subs[0].startedAt.getTime()).toBe(90 * 86_400_000);
+  });
+
   it('rate-limits payment attempts per device', async () => {
     mockNotch({});
     for (let i = 0; i < 5; i++) await start();

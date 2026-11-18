@@ -62,10 +62,13 @@ export class PaymentsSettler {
       const activated = await this.prisma.$transaction(async (db) => {
         const claim = await db.payment.updateMany({
           where: { id: payment.id, status: 'PENDING' },
-          data: { status: 'COMPLETE', completedAt: new Date(), rawProviderState: { status: tx.status, completed_at: tx.completed_at ?? null } },
+          data: { status: 'COMPLETE', completedAt: new Date(), rawProviderState: { ...(typeof payment.rawProviderState === 'object' && payment.rawProviderState !== null && !Array.isArray(payment.rawProviderState) ? payment.rawProviderState : {}), status: tx.status, completed_at: tx.completed_at ?? null } },
         });
         if (claim.count === 0) return false;
-        await this.subs.activate(db, { deviceId: payment.deviceId, amount: payment.amount, currency: payment.currency, transactionId: payment.notchReference ?? payment.reference });
+        const paymentMetadata = typeof payment.rawProviderState === 'object' && payment.rawProviderState !== null && !Array.isArray(payment.rawProviderState) ? payment.rawProviderState as { periodDays?: unknown } : {};
+        const configuredPeriod = Number(paymentMetadata.periodDays);
+        const periodDays = Number.isInteger(configuredPeriod) && configuredPeriod > 0 && configuredPeriod <= 366 ? configuredPeriod : this.subs.periodDays();
+        await this.subs.activate(db, { deviceId: payment.deviceId, amount: payment.amount, periodDays, currency: payment.currency, transactionId: payment.notchReference ?? payment.reference });
         return true;
       });
       if (activated) await this.audit.log({ deviceId: payment.deviceId, action: 'subscription.activated', entity: 'payment', entityId: payment.id, metadata: { amount: payment.amount, provider: 'NOTCHPAY' } });
